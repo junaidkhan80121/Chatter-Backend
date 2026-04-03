@@ -17,7 +17,7 @@ from app.socket.manager import sio
 limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
-    title="PulseChat API",
+    title="Chatter API",
     description="Real-time chat application API",
     version="1.0.0",
     docs_url="/api/docs",
@@ -49,7 +49,7 @@ app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads"
 async def startup():
     await create_tables()
     await get_redis()
-    print("✅ PulseChat API started")
+    print("✅ Chatter API started")
 
 
 @app.on_event("shutdown")
@@ -59,7 +59,7 @@ async def shutdown():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "pulsechat-api"}
+    return {"status": "ok", "service": "chatter-api"}
 
 
 # Mount Socket.IO as ASGI sub-application

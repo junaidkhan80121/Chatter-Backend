@@ -1,5 +1,5 @@
 """
-Unit tests for PulseChat backend.
+Unit tests for Chatter backend.
 Run with: pytest tests/ -v
 """
 import pytest
