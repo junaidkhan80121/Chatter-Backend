@@ -10,10 +10,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
-    DATABASE_URL: str = "postgresql+asyncpg://chatter:chatter_pass@postgres:5432/chatter"
-    SYNC_DATABASE_URL: str = "postgresql://chatter:chatter_pass@postgres:5432/chatter"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:secret@localhost:5432/chatter"
+    SYNC_DATABASE_URL: str = "postgresql://postgres:secret@localhost:5432/chatter"
 
-    REDIS_URL: str = "redis://redis:6379/0"
+    REDIS_URL: str = "redis://localhost:6379/0"
 
     CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000", "http://frontend:80"]
 
@@ -28,13 +28,14 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     EMAIL_FROM: str = "noreply@chatter.app"
 
-    CELERY_BROKER_URL: str = "redis://redis:6379/1"
-    CELERY_RESULT_BACKEND: str = "redis://redis:6379/2"
+    CELERY_BROKER_URL: str = "redis://localhost:6379/1"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
 
     FRONTEND_URL: str = "http://localhost:5173"
 
     class Config:
         env_file = ".env"
+        env_file_encoding = 'utf-8'
         case_sensitive = True
 
 
