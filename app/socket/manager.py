@@ -12,6 +12,7 @@ from app.core.security import decode_token
 from app.core.database import AsyncSessionLocal
 from app.repositories.user_repo import UserRepository
 from app.repositories.message_repo import MessageRepository, ConversationRepository
+from app.models.notification import Notification
 
 # Redis-backed message queue for pub/sub scaling
 mgr = socketio.AsyncRedisManager(settings.REDIS_URL)
@@ -140,6 +141,36 @@ async def send_message(sid, data):
             file_name=file_name,
             file_size=file_size,
         )
+
+        recipient_ids = [p.user_id for p in conv.participants if p.user_id != user_id]
+        sender_name = (
+            msg.sender.display_name
+            or msg.sender.username
+            if msg.sender
+            else "Someone"
+        )
+
+        preview_text = (
+            content
+            if content
+            else ("Sent an image" if message_type == "image" else "Sent an attachment")
+        )
+        for recipient_id in recipient_ids:
+            db.add(
+                Notification(
+                    user_id=recipient_id,
+                    type="message",
+                    title=f"New message from {sender_name}",
+                    body=preview_text,
+                    data={
+                        "conversation_id": conv_id,
+                        "sender_id": user_id,
+                        "message_id": msg.id,
+                        "message_type": message_type,
+                    },
+                )
+            )
+
         await db.commit()
 
         msg_data = {
@@ -167,6 +198,23 @@ async def send_message(sid, data):
     await sio.emit("message_new", msg_data, room=f"conv_{conv_id}", skip_sid=sid)
     # Send ack to sender
     await sio.emit("message_sent", msg_data, to=sid)
+
+    # Emit notification event to recipients
+    redis = await get_redis()
+    for recipient_id in recipient_ids:
+        recipient_sid = await redis.get(RedisKeys.user_socket(recipient_id))
+        if recipient_sid:
+            await sio.emit(
+                "notification_new",
+                {
+                    "type": "message",
+                    "title": f"New message from {sender_name}",
+                    "body": preview_text,
+                    "data": {"conversation_id": conv_id, "sender_id": user_id},
+                    "created_at": msg.created_at.isoformat(),
+                },
+                to=recipient_sid,
+            )
 
 
 @sio.event

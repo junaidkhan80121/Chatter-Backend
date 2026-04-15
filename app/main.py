@@ -10,6 +10,7 @@ import os
 from app.core.config import settings
 from app.core.database import create_tables
 from app.core.redis import get_redis, close_redis
+from app.core.demo_seed import ensure_demo_data
 from app.api.router import api_router
 from app.socket.manager import sio
 
@@ -49,6 +50,8 @@ app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads"
 async def startup():
     await create_tables()
     await get_redis()
+    if settings.APP_ENV != "production":
+        await ensure_demo_data()
     print("✅ Chatter API started")
 
 
