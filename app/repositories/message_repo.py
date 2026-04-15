@@ -1,12 +1,12 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, and_, func, desc
+from sqlalchemy import select, or_, and_, func, desc, exists
 from sqlalchemy.orm import selectinload, joinedload
 from typing import Optional
 import uuid
 from datetime import datetime, timezone
 
 from app.models.conversation import Conversation, ConversationParticipant
-from app.models.message import Message, MessageRead
+from app.models.message import Message, MessageRead, MessageHidden
 from app.models.user import User
 
 
@@ -46,14 +46,25 @@ class MessageRepository:
     async def get_paginated(
         self,
         conversation_id: str,
+        user_id: str,
         limit: int = 50,
         before_id: Optional[str] = None,
     ) -> list[Message]:
+        hidden_subquery = (
+            select(MessageHidden.message_id)
+            .where(
+                MessageHidden.message_id == Message.id,
+                MessageHidden.user_id == user_id,
+            )
+            .exists()
+        )
+
         stmt = (
             select(Message)
             .where(
                 Message.conversation_id == conversation_id,
                 Message.deleted_at.is_(None),
+                ~hidden_subquery,
             )
             .options(selectinload(Message.sender))
             .order_by(desc(Message.created_at))
@@ -71,13 +82,22 @@ class MessageRepository:
         result = await self.db.execute(stmt)
         return result.scalars().all()
 
-    async def search(self, conversation_id: str, query: str, limit: int = 30) -> list[Message]:
+    async def search(self, conversation_id: str, user_id: str, query: str, limit: int = 30) -> list[Message]:
+        hidden_subquery = (
+            select(MessageHidden.message_id)
+            .where(
+                MessageHidden.message_id == Message.id,
+                MessageHidden.user_id == user_id,
+            )
+            .exists()
+        )
         stmt = (
             select(Message)
             .where(
                 Message.conversation_id == conversation_id,
                 Message.content.ilike(f"%{query}%"),
                 Message.deleted_at.is_(None),
+                ~hidden_subquery,
             )
             .options(selectinload(Message.sender))
             .order_by(desc(Message.created_at))
@@ -105,6 +125,22 @@ class MessageRepository:
             .options(selectinload(Message.sender))
         )
         return result.scalar_one_or_none()
+
+    async def hide_for_user(self, message_id: str, user_id: str):
+        existing = await self.db.execute(
+            select(MessageHidden).where(
+                MessageHidden.message_id == message_id,
+                MessageHidden.user_id == user_id,
+            )
+        )
+        if existing.scalar_one_or_none():
+            return
+        self.db.add(MessageHidden(message_id=message_id, user_id=user_id))
+        await self.db.flush()
+
+    async def delete_for_everyone(self, message: Message):
+        message.deleted_at = datetime.now(timezone.utc)
+        await self.db.flush()
 
 
 class ConversationRepository:
@@ -195,9 +231,9 @@ class ConversationRepository:
             return await self.get_by_id(row[0])
         return None
 
-    async def get_last_message(self, conversation_id: str) -> Optional[Message]:
+    async def get_last_message(self, conversation_id: str, user_id: Optional[str] = None) -> Optional[Message]:
         from app.models.message import Message
-        result = await self.db.execute(
+        stmt = (
             select(Message)
             .where(
                 Message.conversation_id == conversation_id,
@@ -207,4 +243,16 @@ class ConversationRepository:
             .order_by(desc(Message.created_at))
             .limit(1)
         )
+        if user_id:
+            hidden_subquery = (
+                select(MessageHidden.message_id)
+                .where(
+                    MessageHidden.message_id == Message.id,
+                    MessageHidden.user_id == user_id,
+                )
+                .exists()
+            )
+            stmt = stmt.where(~hidden_subquery)
+
+        result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
