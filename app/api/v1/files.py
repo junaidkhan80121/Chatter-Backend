@@ -11,9 +11,9 @@ router = APIRouter(prefix="/files", tags=["Files"])
 
 ALLOWED_TYPES = {
     "image/jpeg", "image/png", "image/gif", "image/webp",
-    "application/pdf", "text/plain",
-    "video/mp4", "video/webm",
-    "audio/mpeg", "audio/ogg", "audio/wav",
+    "application/pdf", "text/plain", "application/zip", "application/json",
+    "video/mp4", "video/webm", "video/quicktime", "video/x-matroska",
+    "audio/mpeg", "audio/ogg", "audio/wav", "audio/webm", "audio/mp4",
 }
 
 
