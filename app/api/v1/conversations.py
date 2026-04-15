@@ -29,7 +29,7 @@ async def get_conversations(
 
     result = []
     for conv in conversations:
-        last_msg = await conv_repo.get_last_message(conv.id)
+        last_msg = await conv_repo.get_last_message(conv.id, current_user.id)
         participants = [
             UserPublic.model_validate(p.user)
             for p in conv.participants
@@ -69,7 +69,7 @@ async def create_conversation(
                 for p in existing.participants
                 if p.user
             ]
-            last_msg = await conv_repo.get_last_message(existing.id)
+            last_msg = await conv_repo.get_last_message(existing.id, current_user.id)
             return ConversationOut(
                 id=existing.id, type=existing.type,
                 name=existing.name, avatar_url=existing.avatar_url,
@@ -114,7 +114,7 @@ async def get_messages(
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     msg_repo = MessageRepository(db)
-    messages = await msg_repo.get_paginated(conv_id, limit=limit, before_id=before_id)
+    messages = await msg_repo.get_paginated(conv_id, current_user.id, limit=limit, before_id=before_id)
 
     has_more = len(messages) > limit
     if has_more:
@@ -195,5 +195,5 @@ async def search_messages(
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     msg_repo = MessageRepository(db)
-    messages = await msg_repo.search(conv_id, q)
+    messages = await msg_repo.search(conv_id, current_user.id, q)
     return [MessageOut.model_validate(m) for m in messages]
